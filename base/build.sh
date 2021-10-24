@@ -92,6 +92,21 @@ cmd buildah config \
     --workingdir "/var/www/html" \
     "$CONTAINER"
 
+echo + "PHP_VERSION=\"\$(buildah run $CONTAINER -- /bin/sh -c 'echo \"\$PHP_VERSION\"')\""
+PHP_VERSION="$(buildah run "$CONTAINER" -- /bin/sh -c 'echo "$PHP_VERSION"')"
+
+cmd buildah config \
+    --annotation org.opencontainers.image.title="php-fpm" \
+    --annotation org.opencontainers.image.description="A php-fpm container with an improved configuration structure." \
+    --annotation org.opencontainers.image.version="$PHP_VERSION" \
+    --annotation org.opencontainers.image.url="https://github.com/SGSGermany/php-fpm" \
+    --annotation org.opencontainers.image.authors="SGS Serious Gaming & Simulations GmbH" \
+    --annotation org.opencontainers.image.vendor="SGS Serious Gaming & Simulations GmbH" \
+    --annotation org.opencontainers.image.licenses="MIT" \
+    --annotation org.opencontainers.image.base.name="$REGISTRY/$OWNER/$IMAGE:$DEFAULT_TAG" \
+    --annotation org.opencontainers.image.base.digest="$(podman image inspect --format '{{.Digest}}' "$IMAGE:$DEFAULT_TAG")" \
+    "$CONTAINER"
+
 cmd buildah commit "$CONTAINER" "$IMAGE:${TAGS[0]}"
 cmd buildah rm "$CONTAINER"
 

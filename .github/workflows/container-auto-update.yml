@@ -1,0 +1,136 @@
+name: Periodically rebuild & publish containers (auto update)
+
+on:
+  schedule:
+    # run four times a day on 05:37 UTC, 11:37 UTC, 17:37 UTC and 23:37 UTC
+    - cron: '37 5,11,17,23 * * *'
+
+env:
+  GIT_REMOTE_URL: ${{ github.server_url }}/${{ github.repository }}.git
+  CI_TOOLS_SETUP: https://raw.githubusercontent.com/SGSGermany/ci-tools/main/setup.sh
+
+jobs:
+  generate-jobs:
+    name: Generate jobs
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    outputs:
+      BUILD_MATRIX: ${{ steps.generate-jobs.outputs.BUILD_MATRIX }}
+
+    env:
+      VERSIONS: '7.3 7.4 8.0'
+      RUN_ON_BRANCHES: 'main'
+
+    steps:
+      - name: Setup CI tools
+        run: |
+          . <(curl -fsS -L "$CI_TOOLS_SETUP" | bash -s ~/ci-tools)
+          echo "CI_TOOLS_PATH=$CI_TOOLS_PATH" | tee -a "$GITHUB_ENV"
+
+      - name: Generate jobs
+        id: generate-jobs
+        run: |
+          VERSIONS="$(echo "$VERSIONS" | tr ' ' '\n')"
+          BUILD_REF="$("$CI_TOOLS_PATH/containers/generate-scheduled-jobs.sh")"
+          
+          BUILD_MATRIX="$(jq -n -c \
+            --slurpfile VERSION <(echo "$VERSIONS" | jq -R .) \
+            --slurpfile BUILD_REF <(echo "$BUILD_REF" | jq -R .) \
+            '{"VERSION": $VERSION, "BUILD_REF": $BUILD_REF}')"
+          
+          echo ::group::Build matrix
+          echo "$BUILD_MATRIX" | jq
+          echo ::endgroup::
+          
+          echo "::set-output name=BUILD_MATRIX::$BUILD_MATRIX"
+
+  build:
+    name: Build & publish container
+
+    needs: generate-jobs
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    concurrency: build-${{ matrix.BUILD_REF }}
+
+    strategy:
+      matrix: ${{ fromJSON(needs.generate-jobs.outputs.BUILD_MATRIX) }}
+      fail-fast: false
+      max-parallel: 1
+
+    env:
+      REGISTRY: ghcr.io
+      OWNER: sgsgermany
+      IMAGE: php-fpm
+      VERSION: ${{ matrix.VERSION }}
+      BUILD_REF: ${{ matrix.BUILD_REF }}
+
+    steps:
+      - name: Setup CI tools
+        run: |
+          . <(curl -fsS -L "$CI_TOOLS_SETUP" | bash -s ~/ci-tools)
+          echo "CI_TOOLS_PATH=$CI_TOOLS_PATH" | tee -a "$GITHUB_ENV"
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ env.BUILD_REF }}
+
+      - name: Log into container registry ${{ env.REGISTRY }}
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate container image tags
+        run: |
+          source <(./tags.sh)
+          echo "VERSION=$VERSION" | tee -a "$GITHUB_ENV"
+          echo "DEFAULT_TAGS=${DEFAULT_TAGS:-v$VERSION-default}" | tee -a "$GITHUB_ENV"
+          echo "BASE_TAGS=${BASE_TAGS:-v$VERSION}" | tee -a "$GITHUB_ENV"
+
+      - name: Check for updates
+        run: |
+          BUILD_ACTION="$(TAGS="$DEFAULT_TAGS" "$CI_TOOLS_PATH/containers/check-for-updates.sh")"
+          echo "BUILD_ACTION=$BUILD_ACTION" | tee -a "$GITHUB_ENV"
+
+      - name: Build 'default' container image
+        if: ${{ env.BUILD_ACTION != '' }}
+        run: |
+          buildah unshare ./default/build.sh
+
+      - name: Metadata of 'default' container image
+        run: |
+          "$CI_TOOLS_PATH/containers/get-metadata.sh" "$REGISTRY/$OWNER" "$IMAGE:v$VERSION-default"
+
+      - name: Build 'base' container image
+        if: ${{ env.BUILD_ACTION != '' }}
+        run: |
+          buildah unshare ./base/build.sh
+
+      - name: Metadata of 'base' container image
+        run: |
+          "$CI_TOOLS_PATH/containers/get-metadata.sh" "$REGISTRY/$OWNER" "$IMAGE:v$VERSION"
+
+      - name: Push 'default' container image
+        if: ${{ env.BUILD_ACTION != '' }}
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ env.IMAGE }}
+          registry: ${{ env.REGISTRY }}/${{ env.OWNER }}
+          tags: ${{ env.DEFAULT_TAGS }}
+
+      - name: Push 'base' container image
+        if: ${{ env.BUILD_ACTION != '' }}
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ env.IMAGE }}
+          registry: ${{ env.REGISTRY }}/${{ env.OWNER }}
+          tags: ${{ env.BASE_TAGS }}
