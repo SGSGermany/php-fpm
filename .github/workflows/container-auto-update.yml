@@ -101,6 +101,11 @@ jobs:
           BUILD_ACTION="$(TAGS="$DEFAULT_TAGS" "$CI_TOOLS_PATH/containers/check-for-updates.sh")"
           echo "BUILD_ACTION=$BUILD_ACTION" | tee -a "$GITHUB_ENV"
 
+      - name: Check for config changes
+        if: ${{ env.BUILD_ACTION != '' }}
+        run: |
+          buildah unshare ./default/check-config.sh
+
       - name: Build 'default' container image
         if: ${{ env.BUILD_ACTION != '' }}
         run: |
