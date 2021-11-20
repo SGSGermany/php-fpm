@@ -10,13 +10,13 @@
 # SPDX-License-Identifier: MIT
 # License-Filename: LICENSE
 
-set -e
+set -eu -o pipefail
 export LC_ALL=C
 
 php_ls_versions() {
-    local DATA="$(curl -fsSL "https://www.php.net/releases/index.php?json&version=$1&max=-1")"
-    [ "$(echo "$DATA" | jq -r 'has("error")')" == "false" ] \
-        && echo "$DATA" | jq -r 'keys[]' | sort_semver
+    jq -re --arg "VERSION" "$1" \
+        '.Tags[]|select(test("^[0-9]+\\.[0-9]+\\.[0-9]+-fpm-alpine$") and startswith($VERSION + "."))[:-11]' \
+        <<<"$BASE_IMAGE_REPO_TAGS" | sort_semver
 }
 
 sort_semver() {
@@ -38,14 +38,19 @@ PHP_VERSION="$(podman image inspect --format '{{range .Config.Env}}{{printf "%q\
 if [ -z "$PHP_VERSION" ]; then
     echo "Unable to read image's env variable 'PHP_VERSION': No such variable" >&2
     exit 1
-fi
-if ! [[ "$PHP_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+elif ! [[ "$PHP_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
     echo "Unable to read image's env variable 'PHP_VERSION': '$PHP_VERSION' is no valid version" >&2
     exit 1
 fi
 
 PHP_VERSION_MINOR="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
 PHP_VERSION_MAJOR="${BASH_REMATCH[1]}"
+
+BASE_IMAGE_REPO_TAGS="$(skopeo list-tags "docker://${BASE_IMAGE%:*}" || true)"
+if [ -z "$BASE_IMAGE_REPO_TAGS" ]; then
+    echo "Unable to read tags from container repository 'docker://${BASE_IMAGE%:*}'" >&2
+    exit 1
+fi
 
 TAG_DATE="$(date -u +'%Y%m%d%H%M')"
 
