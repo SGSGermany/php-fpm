@@ -83,6 +83,8 @@ cmd buildah run "$CONTAINER" -- \
 cmd buildah run "$CONTAINER" -- \
     chmod +t "/tmp/php"
 
+cmd buildah config --port "-" "$CONTAINER"
+
 cmd buildah config \
     --volume "/run/php-fpm" \
     --volume "/var/log/php" \
