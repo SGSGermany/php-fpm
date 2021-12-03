@@ -10,7 +10,7 @@
 # SPDX-License-Identifier: MIT
 # License-Filename: LICENSE
 
-set -e
+set -eu -o pipefail
 export LC_ALL=C
 shopt -s nullglob
 
