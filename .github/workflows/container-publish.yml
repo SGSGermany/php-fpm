@@ -30,7 +30,7 @@ jobs:
     steps:
       - name: Setup CI tools
         run: |
-          . <(curl -fsS -L "$CI_TOOLS_SETUP" | bash -s ~/ci-tools)
+          . <(curl -fsS -L "$CI_TOOLS_SETUP" | bash -s ~/ci-tools "5f1fd47b7be27639652e19acb37af3b2d2db8a33")
           echo "CI_TOOLS_PATH=$CI_TOOLS_PATH" | tee -a "$GITHUB_ENV"
 
       - name: Checkout repository
