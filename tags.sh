@@ -14,9 +14,17 @@ set -eu -o pipefail
 export LC_ALL=C
 
 php_ls_versions() {
-    jq -re --arg "VERSION" "$1" \
-        '.Tags[]|select(test("^[0-9]+\\.[0-9]+\\.[0-9]+-fpm-alpine$") and startswith($VERSION + "."))[:-11]' \
-        <<<"$BASE_IMAGE_REPO_TAGS" | sort_semver
+    local VERSION="${1:-}"
+
+    if [ -n "$VERSION" ]; then
+        jq -re --arg "VERSION" "$VERSION" \
+            '.Tags[]|select(test("^[0-9]+\\.[0-9]+\\.[0-9]+-fpm-alpine$") and startswith($VERSION + "."))[:-11]' \
+            <<<"$BASE_IMAGE_REPO_TAGS" | sort_semver
+    else
+        jq -re \
+            '.Tags[]|select(test("^[0-9]+\\.[0-9]+\\.[0-9]+-fpm-alpine$"))[:-11]' \
+            <<<"$BASE_IMAGE_REPO_TAGS" | sort_semver
+    fi
 }
 
 sort_semver() {
@@ -52,16 +60,25 @@ if [ -z "$BASE_IMAGE_REPO_TAGS" ]; then
     exit 1
 fi
 
+PHP_VERSION_LATEST="$(php_ls_versions | head -n 1)"
+PHP_VERSION_LATEST_MINOR="$(php_ls_versions "$PHP_VERSION_MINOR" | head -n 1)"
+PHP_VERSION_LATEST_MAJOR="$(php_ls_versions "$PHP_VERSION_MAJOR" | head -n 1)"
+
+echo "Tagging version $PHP_VERSION" >&2
+echo "- Latest version of v$PHP_VERSION_MAJOR branch: $PHP_VERSION_LATEST_MAJOR" >&2
+echo "- Latest version of v$PHP_VERSION_MINOR branch: $PHP_VERSION_LATEST_MINOR" >&2
+echo "- Latest version: $PHP_VERSION_LATEST" >&2
+
 TAG_DATE="$(date -u +'%Y%m%d%H%M')"
 
 DEFAULT_TAGS=( "v$PHP_VERSION-default" "v$PHP_VERSION-default_$TAG_DATE" )
 BASE_TAGS=( "v$PHP_VERSION" "v${PHP_VERSION}_$TAG_DATE" )
 
-if [ "$PHP_VERSION" == "$(php_ls_versions "$PHP_VERSION_MINOR" | head -n 1)" ]; then
+if [ "$PHP_VERSION" == "$PHP_VERSION_LATEST_MINOR" ]; then
     DEFAULT_TAGS+=( "v$PHP_VERSION_MINOR-default" "v$PHP_VERSION_MINOR-default_$TAG_DATE" )
     BASE_TAGS+=( "v$PHP_VERSION_MINOR" "v${PHP_VERSION_MINOR}_$TAG_DATE" )
 
-    if [ "$PHP_VERSION" == "$(php_ls_versions "$PHP_VERSION_MAJOR" | head -n 1)" ]; then
+    if [ "$PHP_VERSION" == "$PHP_VERSION_LATEST_MAJOR" ]; then
         DEFAULT_TAGS+=( "v$PHP_VERSION_MAJOR-default" "v$PHP_VERSION_MAJOR-default_$TAG_DATE" )
         BASE_TAGS+=( "v$PHP_VERSION_MAJOR" "v${PHP_VERSION_MAJOR}_$TAG_DATE" )
 
