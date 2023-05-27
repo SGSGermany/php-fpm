@@ -1,0 +1,117 @@
+name: Periodically rebuild & publish containers (auto update)
+
+on:
+  schedule:
+    # run once a day at 22:20 UTC
+    - cron: '20 22 * * *'
+
+concurrency: build
+
+env:
+  CI_TOOLS_SETUP: https://raw.githubusercontent.com/SGSGermany/ci-tools/main/setup.sh
+
+defaults:
+  run:
+    shell: bash -eu -o pipefail {0}
+
+jobs:
+  generate-jobs:
+    name: Generate jobs
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    outputs:
+      BUILD_MATRIX: ${{ steps.generate-jobs.outputs.BUILD_MATRIX }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Generate jobs
+        id: generate-jobs
+        run: |
+          MILESTONES="$(ls -1 ./branches/)"
+          
+          echo ::group::Jobs list
+          echo "$MILESTONES"
+          echo ::endgroup::
+          
+          echo "BUILD_MATRIX=$(jq -R . <<< "$MILESTONES" | jq -c -s '{"MILESTONE": .}')" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build & publish container
+
+    needs: generate-jobs
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    concurrency: build-${{ matrix.MILESTONE }}
+
+    strategy:
+      matrix: ${{ fromJSON(needs.generate-jobs.outputs.BUILD_MATRIX) }}
+      fail-fast: false
+
+    env:
+      REGISTRY: ghcr.io
+      OWNER: sgsgermany
+      IMAGE: php-fpm
+      MILESTONE: ${{ matrix.MILESTONE }}
+
+    steps:
+      - name: Setup CI tools
+        run: |
+          . <(curl -fsS -L "$CI_TOOLS_SETUP" | bash -s ~/ci-tools)
+          echo "CI_TOOLS=$CI_TOOLS" | tee -a "$GITHUB_ENV"
+          echo "CI_TOOLS_PATH=$CI_TOOLS_PATH" | tee -a "$GITHUB_ENV"
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Log into container registry ${{ env.REGISTRY }}
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check latest versions
+        run: |
+          ./versions.sh
+
+      - name: Generate container image tags
+        run: |
+          source <(./tags.sh "$GITHUB_RUN_ID.$GITHUB_RUN_NUMBER")
+          echo "VERSION=$VERSION" | tee -a "$GITHUB_ENV"
+          echo "TAGS=$TAGS" | tee -a "$GITHUB_ENV"
+
+      - name: Check for updates
+        run: |
+          BUILD_ACTION="$(./check-for-updates.sh)"
+          echo "BUILD_ACTION=$BUILD_ACTION" | tee -a "$GITHUB_ENV"
+
+      - name: Build container image
+        if: ${{ env.BUILD_ACTION != '' }}
+        run: |
+          buildah unshare ./build.sh
+
+      - name: Check for config changes
+        if: ${{ env.BUILD_ACTION != '' }}
+        run: |
+          buildah unshare ./check-config.sh
+
+      - name: Container image metadata
+        run: |
+          "$CI_TOOLS_PATH/containers/get-metadata.sh" "$REGISTRY/$OWNER" "$IMAGE:${TAGS%% *}"
+
+      - name: Push container image
+        if: ${{ env.BUILD_ACTION != '' }}
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ env.IMAGE }}
+          registry: ${{ env.REGISTRY }}/${{ env.OWNER }}
+          tags: ${{ env.TAGS }}
