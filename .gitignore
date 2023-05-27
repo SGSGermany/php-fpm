@@ -9,3 +9,6 @@ desktop.ini
 # Mac OS X
 .DS_Store
 ._*
+
+# Build system
+/vendor
