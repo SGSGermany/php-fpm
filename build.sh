@@ -25,7 +25,24 @@ source "$CI_TOOLS_PATH/helper/container-alpine.sh.inc"
 source "$CI_TOOLS_PATH/helper/git.sh.inc"
 
 BUILD_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-source "$BUILD_DIR/container.env"
+
+if [ -v MILESTONE ]; then
+    if [ ! -f "$BUILD_DIR/branches/$MILESTONE/container.env" ]; then
+        echo "Invalid build environment: Invalid environment variable 'MILESTONE':" \
+            "Container environment file '$BUILD_DIR/branches/$MILESTONE/container.env' not found" >&2
+        exit 1
+    fi
+
+    source "$BUILD_DIR/branches/$MILESTONE/container.env"
+else
+    source "$BUILD_DIR/container.env"
+fi
+
+if [ "$VERSION" != "$MILESTONE" ] && [[ "$VERSION" != "$MILESTONE".* ]]; then
+    echo "Invalid build environment: Invalid environment variable 'MILESTONE':" \
+        "Version '$VERSION' is no part of the '$MILESTONE' branch" >&2
+    exit 1
+fi
 
 readarray -t -d' ' TAGS < <(printf '%s' "$TAGS")
 
@@ -43,6 +60,11 @@ MOUNT="$(buildah mount "$CONTAINER")"
 
 echo + "rsync -v -rl --exclude .gitignore ./src/ …/" >&2
 rsync -v -rl --exclude '.gitignore' "$BUILD_DIR/src/" "$MOUNT/"
+
+if [ -d "$BUILD_DIR/branches/$MILESTONE/src" ]; then
+    echo + "rsync -v -rl --exclude .gitignore $(quote "./branches/$MILESTONE/src/") …/" >&2
+    rsync -v -rl --exclude '.gitignore' "$BUILD_DIR/branches/$MILESTONE/src/" "$MOUNT/"
+fi
 
 # prepare users
 user_changeuid "$CONTAINER" www-data 65536 "/usr/local/php"
@@ -105,6 +127,12 @@ mv "$MOUNT/usr/local/etc/pear.conf" "$MOUNT/etc/pear.conf"
 
 echo + "ln -s /etc/pear.conf …/usr/local/etc/pear.conf" >&2
 ln -s "/etc/pear.conf" "$MOUNT/usr/local/etc/pear.conf"
+
+# branch-specific build script
+if [ -f "$BUILD_DIR/branches/$MILESTONE/build.sh.inc" ]; then
+    echo + "source $(quote "./branches/$MILESTONE/build.sh.inc")" >&2
+    source "$BUILD_DIR/branches/$MILESTONE/build.sh.inc"
+fi
 
 # finalize image
 cleanup "$CONTAINER"
