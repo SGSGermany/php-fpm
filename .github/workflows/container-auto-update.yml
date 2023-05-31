@@ -2,8 +2,8 @@ name: Periodically rebuild & publish containers (auto update)
 
 on:
   schedule:
-    # run once a day at 22:20 UTC
-    - cron: '20 22 * * *'
+    # run once a day at 21:50 UTC
+    - cron: '50 21 * * *'
 
 concurrency: build
 

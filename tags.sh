@@ -22,9 +22,6 @@ export LC_ALL=C.UTF-8
 [ -x "$(which jq)" ] \
     || { echo "Invalid build environment: Missing runtime dependency: jq" >&2; exit 1; }
 
-[ -x "$(which curl)" ] \
-    || { echo "Invalid build environment: Missing runtime dependency: curl" >&2; exit 1; }
-
 source "$CI_TOOLS_PATH/helper/common.sh.inc"
 source "$CI_TOOLS_PATH/helper/git.sh.inc"
 

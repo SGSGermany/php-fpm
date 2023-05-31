@@ -19,6 +19,9 @@ export LC_ALL=C.UTF-8
 [ -v CI_TOOLS_PATH ] && [ -d "$CI_TOOLS_PATH" ] \
     || { echo "Invalid build environment: Environment variable 'CI_TOOLS_PATH' not set or invalid" >&2; exit 1; }
 
+[ -x "$(which jq)" ] \
+    || { echo "Invalid build environment: Missing runtime dependency: jq" >&2; exit 1; }
+
 source "$CI_TOOLS_PATH/helper/common.sh.inc"
 source "$CI_TOOLS_PATH/helper/chkupd.sh.inc"
 source "$CI_TOOLS_PATH/helper/git.sh.inc"
@@ -48,18 +51,21 @@ TAG="${TAGS%% *}"
 # check whether the base image was updated
 chkupd_baseimage "$REGISTRY/$OWNER/$IMAGE" "$TAG" || exit 0
 
-# check whether ./vendor/versions.json indicates a new version
-git_clone "$MERGE_IMAGE_GIT_REPO" "$MERGE_IMAGE_GIT_REF" "$BUILD_DIR/vendor" "./vendor"
+# check whether the image is using the latest PHP version
+if [ -z "${VERSION:-}" ] || [ "$VERSION" == "$MILESTONE" ]; then
+    # check whether ./vendor/versions.json indicates a new version
+    git_clone "$MERGE_IMAGE_GIT_REPO" "$MERGE_IMAGE_GIT_REF" "$BUILD_DIR/vendor" "./vendor"
 
-echo + "VERSION=\"\$(jq -re --arg BRANCH $(quote "$MILESTONE") '.[\$BRANCH].version // empty' ./vendor/versions.json)\"" >&2
-VERSION="$(jq -re --arg BRANCH "$MILESTONE" '.[$BRANCH].version // empty' "$BUILD_DIR/vendor/versions.json" || true)"
+    echo + "VERSION=\"\$(jq -re --arg BRANCH $(quote "$MILESTONE") '.[\$BRANCH].version // empty' ./vendor/versions.json)\"" >&2
+    VERSION="$(jq -re --arg BRANCH "$MILESTONE" '.[$BRANCH].version // empty' "$BUILD_DIR/vendor/versions.json" || true)"
 
-if [ -z "$VERSION" ]; then
-    echo "Unable to read PHP version from './vendor/versions.json': No version matching '$MILESTONE' found" >&2
-    exit 1
-elif ! [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([+~-]|$) ]]; then
-    echo "Unable to read PHP version from './vendor/versions.json': '$VERSION' is no valid version" >&2
-    exit 1
+    if [ -z "$VERSION" ]; then
+        echo "Unable to read PHP version from './vendor/versions.json': No version matching '$MILESTONE' found" >&2
+        exit 1
+    elif ! [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([+~-]|$) ]]; then
+        echo "Unable to read PHP version from './vendor/versions.json': '$VERSION' is no valid version" >&2
+        exit 1
+    fi
 fi
 
 chkupd_image_version "$REGISTRY/$OWNER/$IMAGE:$TAG" "$VERSION" || exit 0
