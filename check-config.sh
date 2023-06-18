@@ -22,36 +22,9 @@ shopt -s nullglob
 
 source "$CI_TOOLS_PATH/helper/common.sh.inc"
 source "$CI_TOOLS_PATH/helper/common-traps.sh.inc"
+source "$CI_TOOLS_PATH/helper/chkconf.sh.inc"
 
-prepare_local_conf() {
-    if [ ! -d "$DIFF_DIR/raw/local/$(dirname "$2")" ]; then
-        echo + "mkdir $(quote "\$DIFF_DIR/{raw,clean}/local/$(dirname "$2")")" >&2
-        mkdir "$DIFF_DIR/raw/local/$(dirname "$2")" \
-            "$DIFF_DIR/clean/local/$(dirname "$2")"
-    fi
-
-    echo + "cp $(quote "./branches/$MILESTONE/base-conf/$1") $(quote "\$DIFF_DIR/raw/local/$2")" >&2
-    cp "$BUILD_DIR/branches/$MILESTONE/base-conf/$1" "$DIFF_DIR/raw/local/$2"
-
-    echo + "clean_conf $(quote "\$DIFF_DIR/raw/local/$2") $(quote "\$DIFF_DIR/clean/local/$2")" >&2
-    clean_conf "$DIFF_DIR/raw/local/$2" "$DIFF_DIR/clean/local/$2"
-}
-
-prepare_upstream_conf() {
-    if [ ! -d "$DIFF_DIR/raw/upstream/$(dirname "$2")" ]; then
-        echo + "mkdir $(quote "\$DIFF_DIR/{raw,clean}/upstream/$(dirname "$2")")" >&2
-        mkdir "$DIFF_DIR/raw/upstream/$(dirname "$2")" \
-            "$DIFF_DIR/clean/upstream/$(dirname "$2")"
-    fi
-
-    echo + "cp $(quote "…/$1") $(quote "\$DIFF_DIR/raw/upstream/$2")" >&2
-    cp "$MOUNT/$1" "$DIFF_DIR/raw/upstream/$2"
-
-    echo + "clean_conf $(quote "\$DIFF_DIR/raw/upstream/$2") $(quote "\$DIFF_DIR/clean/upstream/$2")" >&2
-    clean_conf "$DIFF_DIR/raw/upstream/$2" "$DIFF_DIR/clean/upstream/$2"
-}
-
-clean_conf() {
+chkconf_clean() {
     sed -e 's/^\([^;]*\);.*$/\1/' -e '/^\s*$/d' "$1" > "$2"
 }
 
@@ -109,7 +82,7 @@ elif [ "$IMAGE_PARENT" != "$MERGE_IMAGE" ]; then
     exit 1
 fi
 
-# prepare image
+# prepare image for diffing
 echo + "CONTAINER=\"\$(buildah from $(quote "$MERGE_IMAGE"))\"" >&2
 CONTAINER="$(buildah from "$MERGE_IMAGE")"
 
@@ -118,42 +91,45 @@ trap_exit buildah rm "$CONTAINER"
 echo + "MOUNT=\"\$(buildah mount $(quote "$CONTAINER"))\"" >&2
 MOUNT="$(buildah mount "$CONTAINER")"
 
-echo + "DIFF_DIR=\"\$(mktemp -d)\"" >&2
-DIFF_DIR="$(mktemp -d)"
+echo + "CHKCONF_DIR=\"\$(mktemp -d)\"" >&2
+CHKCONF_DIR="$(mktemp -d)"
 
-trap_exit rm -rf "$DIFF_DIR"
+trap_exit rm -rf "$CHKCONF_DIR"
 
-# prepare diff
-echo + "mkdir $(quote "\$DIFF_DIR/{raw,clean}" "\$DIFF_DIR/{raw,clean}/{local,upstream}")" >&2
-mkdir \
-    "$DIFF_DIR/raw" "$DIFF_DIR/raw/local" "$DIFF_DIR/raw/upstream" \
-    "$DIFF_DIR/clean" "$DIFF_DIR/clean/local" "$DIFF_DIR/clean/upstream"
+LOCAL_FILES=()
+UPSTRAM_FILES=()
 
 # php config
-prepare_local_conf "php/php.ini" "php/php.ini"
+LOCAL_FILES+=( "php/php.ini" "php/php.ini" )
 for FILE in "$BUILD_DIR/branches/$MILESTONE/base-conf/php/conf.d/"*".ini"; do
-    prepare_local_conf "php/conf.d/$(basename "$FILE")" "php/conf.d/$(basename "$FILE")"
+    LOCAL_FILES+=( "php/conf.d/$(basename "$FILE")" "php/conf.d/$(basename "$FILE")" )
 done
 
-prepare_upstream_conf "usr/local/etc/php/php.ini-production" "php/php.ini"
+UPSTREAM_FILES+=( "usr/local/etc/php/php.ini-production" "php/php.ini" )
 for FILE in "$MOUNT/usr/local/etc/php/conf.d/"*".ini"; do
-    prepare_upstream_conf "usr/local/etc/php/conf.d/$(basename "$FILE")" "php/conf.d/$(basename "$FILE")"
+    UPSTREAM_FILES+=( "usr/local/etc/php/conf.d/$(basename "$FILE")" "php/conf.d/$(basename "$FILE")" )
 done
 
 # php-fpm config
-prepare_local_conf "php-fpm/php-fpm.conf" "php-fpm/php-fpm.conf"
+LOCAL_FILES+=( "php-fpm/php-fpm.conf" "php-fpm/php-fpm.conf" )
 for FILE in "$BUILD_DIR/branches/$MILESTONE/base-conf/php-fpm/conf.d/"*".conf"; do
-    prepare_local_conf "php-fpm/conf.d/$(basename "$FILE")" "php-fpm/conf.d/$(basename "$FILE")"
+    LOCAL_FILES+=( "php-fpm/conf.d/$(basename "$FILE")" "php-fpm/conf.d/$(basename "$FILE")" )
 done
 
-prepare_upstream_conf "usr/local/etc/php-fpm.conf" "php-fpm/php-fpm.conf"
+UPSTREAM_FILES+=( "usr/local/etc/php-fpm.conf" "php-fpm/php-fpm.conf" )
 for FILE in "$MOUNT/usr/local/etc/php-fpm.d/"*".conf"; do
-    prepare_upstream_conf "usr/local/etc/php-fpm.d/$(basename "$FILE")" "php-fpm/conf.d/$(basename "$FILE")"
+    UPSTREAM_FILES+=( "usr/local/etc/php-fpm.d/$(basename "$FILE")" "php-fpm/conf.d/$(basename "$FILE")" )
 done
 
 # diff configs
-echo + "diff -q -r \$DIFF_DIR/clean/local/ \$DIFF_DIR/clean/upstream/" >&2
-if ! diff -q -r "$DIFF_DIR/clean/local/" "$DIFF_DIR/clean/upstream/" > /dev/null; then
-    ( cd "$DIFF_DIR/raw" ; diff -u -r ./local/ ./upstream/ )
-    exit 1
-fi
+chkconf_prepare \
+    --local "$BUILD_DIR/branches/$MILESTONE/base-conf" "./branches/$MILESTONE/base-conf" \
+    "$CHKCONF_DIR" "/tmp/…" \
+    "${LOCAL_FILES[@]}"
+
+chkconf_prepare \
+    --upstream "$MOUNT" "…" \
+    "$CHKCONF_DIR" "/tmp/…" \
+    "${UPSTREAM_FILES[@]}"
+
+chkconf_diff "$CHKCONF_DIR" "/tmp/…"
