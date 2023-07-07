@@ -59,8 +59,8 @@ if [ -z "$IMAGE_ID" ]; then
     exit 1
 fi
 
-echo + "MERGE_IMAGE=\"\$(podman image inspect --format '{{.Id}}' $(quote "localhost/$IMAGE-base"))\"" >&2
-MERGE_IMAGE="$(podman image inspect --format '{{.Id}}' "localhost/$IMAGE-base" 2> /dev/null || true)"
+echo + "MERGE_IMAGE=\"\$(podman image inspect --format '{{.Id}}' $(quote "localhost/$IMAGE-upstream"))\"" >&2
+MERGE_IMAGE="$(podman image inspect --format '{{.Id}}' "localhost/$IMAGE-upstream" 2> /dev/null || true)"
 
 if [ -z "$MERGE_IMAGE" ]; then
     echo "Failed to check base config of image 'localhost/$IMAGE:$TAG':" \

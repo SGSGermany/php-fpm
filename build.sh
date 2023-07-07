@@ -46,14 +46,25 @@ fi
 
 readarray -t -d' ' TAGS < <(printf '%s' "$TAGS")
 
+echo + "CONTAINER=\"\$(buildah from $(quote "$BASE_IMAGE"))\"" >&2
+CONTAINER="$(buildah from "$BASE_IMAGE")"
+
+echo + "MOUNT=\"\$(buildah mount $(quote "$CONTAINER"))\"" >&2
+MOUNT="$(buildah mount "$CONTAINER")"
+
+echo + "sed -i -E 's/^@community (.+)$/\1/' …/etc/apk/repositories" >&2
+sed -i -E 's/^@community (.+)$/\1/' "$MOUNT/etc/apk/repositories"
+
+con_commit "$CONTAINER" "$IMAGE-base"
+
 git_clone "$MERGE_IMAGE_GIT_REPO" "$MERGE_IMAGE_GIT_REF" "$BUILD_DIR/vendor" "./vendor"
 
-con_build --tag "$IMAGE-base" \
-    --from "$BASE_IMAGE" --check-from "$MERGE_IMAGE_BASE_IMAGE_PATTERN" \
+con_build --tag "$IMAGE-upstream" \
+    --from "$IMAGE-base" --check-from "$MERGE_IMAGE_BASE_IMAGE_PATTERN" \
     "$BUILD_DIR/vendor/$MERGE_IMAGE_BUD_CONTEXT" "./vendor/$MERGE_IMAGE_BUD_CONTEXT"
 
-echo + "CONTAINER=\"\$(buildah from $(quote "$IMAGE-base"))\"" >&2
-CONTAINER="$(buildah from "$IMAGE-base")"
+echo + "CONTAINER=\"\$(buildah from $(quote "$IMAGE-upstream"))\"" >&2
+CONTAINER="$(buildah from "$IMAGE-upstream")"
 
 echo + "MOUNT=\"\$(buildah mount $(quote "$CONTAINER"))\"" >&2
 MOUNT="$(buildah mount "$CONTAINER")"
@@ -161,4 +172,4 @@ cmd buildah config \
     --annotation org.opencontainers.image.base.digest="$(podman image inspect --format '{{.Digest}}' "$BASE_IMAGE")" \
     "$CONTAINER"
 
-con_commit "$CONTAINER" "${TAGS[@]}"
+con_commit "$CONTAINER" "$IMAGE" "${TAGS[@]}"
