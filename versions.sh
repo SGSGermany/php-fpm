@@ -38,7 +38,7 @@ php_local_branches() {
 php_global_branches() {
     local VERSION_URL="https://www.php.net/releases/index.php?json"
 
-    local VERSION_JSON="$(curl -sSL -f -o - "$VERSION_URL")"
+    local VERSION_JSON="$(curl -sSL -o - "$VERSION_URL")"
     if [ -z "$VERSION_JSON" ]; then
         echo "Unable to read supported PHP branches: HTTP request '$VERSION_URL' failed" >&2
         return 1
@@ -92,7 +92,7 @@ php_latest_global_version() {
     local VERSION_URL="https://www.php.net/releases/index.php?json"
     [ -z "$BRANCH" ] || VERSION_URL+="&max=1&version=$BRANCH"
 
-    local VERSION_JSON="$(curl -sSL -f -o - "$VERSION_URL")"
+    local VERSION_JSON="$(curl -sSL -o - "$VERSION_URL")"
     if [ -z "$VERSION_JSON" ]; then
         echo "Unable to read latest PHP version: HTTP request '$VERSION_URL' failed" >&2
         return 1
@@ -170,8 +170,12 @@ VERSION_LATEST_GLOBAL_MINOR="$(php_latest_global_version "$VERSION_MINOR")"
 echo + "VERSION_LATEST_GLOBAL_MAJOR=\"\$(php_latest_global_version $(quote "$VERSION_MAJOR"))\"" >&2
 VERSION_LATEST_GLOBAL_MAJOR="$(php_latest_global_version "$VERSION_MAJOR")"
 
+echo + "SUPPORT_STATUS=\"\$(grep -q -F $(quote "$VERSION_MINOR") <<< \"\$BRANCHES_GLOBAL\" && echo \"Supported\" || echo \"End of life\")\"" >&2
+SUPPORT_STATUS="$(grep -q -F "$VERSION_MINOR" <<< "$BRANCHES_GLOBAL" && echo "Supported" || echo "End of life")"
+
 echo "Milestone: $MILESTONE"
 echo "Version: $VERSION"
+echo "Status: $SUPPORT_STATUS"
 echo
 
 echo "Versions according to ./vendor/versions.json"

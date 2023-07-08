@@ -127,5 +127,6 @@ if [ "$VERSION" == "$VERSION_LATEST_MINOR" ]; then
     fi
 fi
 
+printf 'MILESTONE="%s"\n' "$VERSION_MINOR"
 printf 'VERSION="%s"\n' "$VERSION"
 printf 'TAGS="%s"\n' "${TAGS[*]}"

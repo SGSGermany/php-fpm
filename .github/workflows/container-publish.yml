@@ -93,6 +93,7 @@ jobs:
       - name: Generate container image tags
         run: |
           source <(./tags.sh "$GITHUB_RUN_ID.$GITHUB_RUN_NUMBER")
+          echo "MILESTONE=$MILESTONE" | tee -a "$GITHUB_ENV"
           echo "VERSION=$VERSION" | tee -a "$GITHUB_ENV"
           echo "TAGS=$TAGS" | tee -a "$GITHUB_ENV"
 
