@@ -56,10 +56,10 @@ VERSION_JSON="$(curl -sSL -o - "$VERSION_URL")"
 
 if [ -z "$VERSION_JSON" ]; then
     echo "Unable to determine PHP support status: HTTP request '$VERSION_URL' failed" >&2
-    return 1
+    exit 1
 elif ! jq -e '.' > /dev/null 2>&1 <<< "$VERSION_JSON"; then
     echo "Unable to determine PHP support status: HTTP request '$VERSION_URL' returned a malformed response: $(head -n1 <<< "$VERSION_JSON")" >&2
-    return 1
+    exit 1
 fi
 
 # print PHP support status
