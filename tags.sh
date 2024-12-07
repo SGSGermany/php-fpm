@@ -98,7 +98,8 @@ elif ! [[ "$PHP_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([+~-]|$) ]]; then
     exit 1
 fi
 
-VERSION="$PHP_VERSION"
+VERSION_FULL="$PHP_VERSION"
+VERSION="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
 VERSION_MINOR="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
 VERSION_MAJOR="${BASH_REMATCH[1]}"
 
@@ -128,5 +129,5 @@ if [ "$VERSION" == "$VERSION_LATEST_MINOR" ]; then
 fi
 
 printf 'MILESTONE="%s"\n' "$VERSION_MINOR"
-printf 'VERSION="%s"\n' "$VERSION"
+printf 'VERSION="%s"\n' "$VERSION_FULL"
 printf 'TAGS="%s"\n' "${TAGS[*]}"

@@ -62,7 +62,7 @@ if [ -z "${VERSION:-}" ] || [ "$VERSION" == "$MILESTONE" ]; then
     if [ -z "$VERSION" ]; then
         echo "Unable to read PHP version from './vendor/versions.json': No version matching '$MILESTONE' found" >&2
         exit 1
-    elif ! [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([+~-]|$) ]]; then
+    elif ! [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)([+~-]|$) ]]; then
         echo "Unable to read PHP version from './vendor/versions.json': '$VERSION' is no valid version" >&2
         exit 1
     fi
