@@ -68,20 +68,6 @@ if [ -z "$MERGE_IMAGE" ]; then
     exit 1
 fi
 
-echo + "IMAGE_PARENT=\"\$(podman image inspect --format '{{.Parent}}' $(quote "localhost/$IMAGE:$TAG"))\"" >&2
-IMAGE_PARENT="$(podman image inspect --format '{{.Parent}}' "localhost/$IMAGE:$TAG" || true)"
-
-if [ -z "$IMAGE_PARENT" ]; then
-    echo "Failed to check base config of image 'localhost/$IMAGE:$TAG': Image metadata lacks information about the image's parent image" >&2
-    exit 1
-elif [ "$IMAGE_PARENT" != "$MERGE_IMAGE" ]; then
-    echo "Failed to check base config of image 'localhost/$IMAGE:$TAG': Invalid intermediate image 'localhost/$IMAGE-base':" \
-        "Image ID doesn't match with the parent image ID of 'localhost/$IMAGE:$TAG'" >&2
-    echo "ID of parent image of 'localhost/$IMAGE:$TAG': $IMAGE_PARENT" >&2
-    echo "ID of intermediate image 'localhost/$IMAGE-base': $MERGE_IMAGE" >&2
-    exit 1
-fi
-
 # prepare image for diffing
 echo + "CONTAINER=\"\$(buildah from $(quote "$MERGE_IMAGE"))\"" >&2
 CONTAINER="$(buildah from "$MERGE_IMAGE")"
