@@ -78,7 +78,7 @@ if [ -d "$BUILD_DIR/branches/$MILESTONE/src" ]; then
 fi
 
 # prepare users
-user_changeuid "$CONTAINER" www-data 65536 "/usr/local/php"
+user_changeuid "$CONTAINER" www-data 65536 "/var/www/html"
 
 user_add "$CONTAINER" php-sock 65537
 
