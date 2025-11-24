@@ -101,10 +101,6 @@ jobs:
         run: |
           buildah unshare ./build.sh
 
-      - name: Check for config changes
-        run: |
-          buildah unshare ./check-config.sh
-
       - name: Container image metadata
         run: |
           podman image inspect "localhost/$IMAGE:${TAGS%% *}"

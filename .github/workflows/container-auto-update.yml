@@ -104,11 +104,6 @@ jobs:
         run: |
           buildah unshare ./build.sh
 
-      - name: Check for config changes
-        if: ${{ env.BUILD_ACTION != '' }}
-        run: |
-          buildah unshare ./check-config.sh
-
       - name: Container image metadata
         run: |
           "$CI_TOOLS_PATH/containers/get-metadata.sh" "$REGISTRY/$OWNER" "$IMAGE:${TAGS%% *}"

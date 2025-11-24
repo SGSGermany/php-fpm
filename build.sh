@@ -22,6 +22,7 @@ export LC_ALL=C.UTF-8
 source "$CI_TOOLS_PATH/helper/common.sh.inc"
 source "$CI_TOOLS_PATH/helper/container.sh.inc"
 source "$CI_TOOLS_PATH/helper/container-alpine.sh.inc"
+source "$CI_TOOLS_PATH/helper/php.sh.inc"
 source "$CI_TOOLS_PATH/helper/git.sh.inc"
 
 BUILD_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -108,13 +109,16 @@ cmd buildah run "$CONTAINER" -- \
     chmod +t "/tmp/php"
 
 # php config
-echo + "mv -t …/etc/php/ …/usr/local/etc/php/php.ini-{production,development}" >&2
-mv -t "$MOUNT/etc/php/" \
-    "$MOUNT/usr/local/etc/php/php.ini-production" \
-    "$MOUNT/usr/local/etc/php/php.ini-development"
+echo + "mv …/usr/local/etc/php/php.ini-{production,development} …/etc/php/" >&2
+mv "$MOUNT/usr/local/etc/php/php.ini-production" \
+    "$MOUNT/usr/local/etc/php/php.ini-development" \
+    "$MOUNT/etc/php/"
 
-echo + "rm -rf …/usr/local/etc/php/conf.d" >&2
-rm -rf "$MOUNT/usr/local/etc/php/conf.d"
+echo + "mv -T …/usr/local/etc/php/conf.d …/etc/php/conf.d" >&2
+mv -T "$MOUNT/usr/local/etc/php/conf.d" "$MOUNT/etc/php/conf.d"
+
+echo + "ln -s php.ini-production …/etc/php/php.ini" >&2
+ln -s "php.ini-production" "$MOUNT/etc/php/php.ini"
 
 echo + "ln -s /etc/php/php.ini …/usr/local/etc/php/php.ini" >&2
 ln -s "/etc/php/php.ini" "$MOUNT/usr/local/etc/php/php.ini"
@@ -123,11 +127,57 @@ echo + "ln -s /etc/php/conf.d/ …/usr/local/etc/php/conf.d" >&2
 ln -s "/etc/php/conf.d/" "$MOUNT/usr/local/etc/php/conf.d"
 
 # php-fpm config
-echo + "rm -f …/usr/local/etc/php-fpm.conf{,.default}" >&2
-rm -f "$MOUNT/usr/local/etc/php-fpm.conf" "$MOUNT/usr/local/etc/php-fpm.conf.default"
+echo + "mv …/usr/local/etc/php-fpm.conf …/etc/php-fpm/php-fpm.conf" >&2
+mv "$MOUNT/usr/local/etc/php-fpm.conf" "$MOUNT/etc/php-fpm/php-fpm.conf"
 
-echo + "rm -rf …/usr/local/etc/php-fpm.conf.d" >&2
-rm -rf "$MOUNT/usr/local/etc/php-fpm.conf.d"
+echo + "rm -f …/usr/local/etc/php-fpm.conf.default" >&2
+rm -f "$MOUNT/usr/local/etc/php-fpm.conf.default"
+
+echo + "mv …/usr/local/etc/php-fpm.d/www.conf …/etc/php-fpm/pool.d/www.conf" >&2
+mv "$MOUNT/usr/local/etc/php-fpm.d/www.conf" "$MOUNT/etc/php-fpm/pool.d/www.conf"
+
+echo + "rm -rf …/usr/local/etc/php-fpm.d" >&2
+rm -rf "$MOUNT/usr/local/etc/php-fpm.d"
+
+cmd php_patch_config "$CONTAINER" "/etc/php-fpm/php-fpm.conf" \
+    "pid" "/run/php-fpm.pid" \
+    "error_log" "/proc/self/fd/2" \
+    "daemonize" "no" \
+    "include" "/etc/php-fpm/pool.d/*.conf"
+
+cmd php_patch_config "$CONTAINER" "/etc/php-fpm/pool.d/www.conf" \
+    "listen" "/run/php-fpm/php-fpm_www.sock" \
+    "listen.owner" "php-sock" \
+    "listen.group" "php-sock" \
+    "listen.mode" "0660" \
+    "pm" "dynamic" \
+    "pm.max_children" "20" \
+    "pm.start_servers" "4" \
+    "pm.min_spare_servers" "2" \
+    "pm.max_spare_servers" "4" \
+    "chdir" "/var/www/html" \
+    "catch_workers_output" "yes" \
+    "decorate_workers_output" "yes" \
+    "clear_env" "yes"
+
+PHP_FPM_PATH_ENV=( "/usr/local/sbin" "/usr/local/bin" "/usr/sbin" "/usr/bin" "/sbin" "/bin" )
+cmd php_patch_config_list "$CONTAINER" "/etc/php-fpm/pool.d/www.conf" \
+    "env" \
+    "env[HOSTNAME] = \$HOSTNAME" \
+    "env[PATH] = $(IFS=:; echo "${PHP_FPM_PATH_ENV[*]}")" \
+    "env[TMPDIR] = /tmp/php/php-tmp/"
+
+PHP_FPM_OPEN_BASEDIR_CONF=( "/var/www/" "/usr/local/lib/php/" "/tmp/php/" "/dev/urandom" )
+cmd php_patch_config_list "$CONTAINER" "/etc/php-fpm/pool.d/www.conf" \
+    "php(_admin)?_(flag|value)" \
+    "php_admin_value[open_basedir] = $(IFS=:; echo "${PHP_FPM_OPEN_BASEDIR_CONF[*]}")" \
+    "php_flag[log_errors] = on" \
+    "php_value[error_log] = /var/log/php/php-error_www.log" \
+    "php_value[sys_temp_dir] = /tmp/php/php-tmp/" \
+    "php_value[upload_tmp_dir] = /tmp/php/php-uploads/" \
+    "php_value[session.save_path] = /tmp/php/php-session/" \
+    "php_value[expose_php] = off" \
+    "php_admin_value[memory_limit] = 128M"
 
 echo + "ln -s /etc/php-fpm/php-fpm.conf …/usr/local/etc/php-fpm.conf" >&2
 ln -s "/etc/php-fpm/php-fpm.conf" "$MOUNT/usr/local/etc/php-fpm.conf"
