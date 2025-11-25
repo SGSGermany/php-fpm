@@ -20,6 +20,7 @@ export LC_ALL=C.UTF-8
     || { echo "Invalid build environment: Environment variable 'CI_TOOLS_PATH' not set or invalid" >&2; exit 1; }
 
 source "$CI_TOOLS_PATH/helper/common.sh.inc"
+source "$CI_TOOLS_PATH/helper/common-traps.sh.inc"
 source "$CI_TOOLS_PATH/helper/container.sh.inc"
 source "$CI_TOOLS_PATH/helper/container-alpine.sh.inc"
 source "$CI_TOOLS_PATH/helper/php.sh.inc"
@@ -57,6 +58,7 @@ echo + "sed -i -E 's/^@community (.+)$/\1/' …/etc/apk/repositories" >&2
 sed -i -E 's/^@community (.+)$/\1/' "$MOUNT/etc/apk/repositories"
 
 con_commit "$CONTAINER" "$IMAGE-base"
+trap_exit podman rmi "$IMAGE-base"
 
 git_clone "$MERGE_IMAGE_GIT_REPO" "$MERGE_IMAGE_GIT_REF" "$BUILD_DIR/vendor" "./vendor"
 
