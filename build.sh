@@ -163,21 +163,21 @@ cmd php_patch_config "$CONTAINER" "/etc/php-fpm/pool.d/www.conf" \
 PHP_FPM_PATH_ENV=( "/usr/local/sbin" "/usr/local/bin" "/usr/sbin" "/usr/bin" "/sbin" "/bin" )
 cmd php_patch_config_list "$CONTAINER" "/etc/php-fpm/pool.d/www.conf" \
     "env" \
-    "env[HOSTNAME] = \$HOSTNAME" \
-    "env[PATH] = $(IFS=:; echo "${PHP_FPM_PATH_ENV[*]}")" \
-    "env[TMPDIR] = /tmp/php/php-tmp/"
+    "env[HOSTNAME]" "\$HOSTNAME" \
+    "env[PATH]" "$(IFS=:; echo "${PHP_FPM_PATH_ENV[*]}")" \
+    "env[TMPDIR]" "/tmp/php/php-tmp/"
 
 PHP_FPM_OPEN_BASEDIR_CONF=( "/var/www/" "/usr/local/lib/php/" "/tmp/php/" "/dev/urandom" )
 cmd php_patch_config_list "$CONTAINER" "/etc/php-fpm/pool.d/www.conf" \
     "php(_admin)?_(flag|value)" \
-    "php_admin_value[open_basedir] = $(IFS=:; echo "${PHP_FPM_OPEN_BASEDIR_CONF[*]}")" \
-    "php_flag[log_errors] = on" \
-    "php_value[error_log] = /var/log/php/php-error_www.log" \
-    "php_value[sys_temp_dir] = /tmp/php/php-tmp/" \
-    "php_value[upload_tmp_dir] = /tmp/php/php-uploads/" \
-    "php_value[session.save_path] = /tmp/php/php-session/" \
-    "php_value[expose_php] = off" \
-    "php_admin_value[memory_limit] = 128M"
+    "php_admin_value[open_basedir]" "$(IFS=:; echo "${PHP_FPM_OPEN_BASEDIR_CONF[*]}")" \
+    "php_flag[log_errors]" "on" \
+    "php_value[error_log]" "/var/log/php/php-error_www.log" \
+    "php_value[sys_temp_dir]" "/tmp/php/php-tmp/" \
+    "php_value[upload_tmp_dir]" "/tmp/php/php-uploads/" \
+    "php_value[session.save_path]" "/tmp/php/php-session/" \
+    "php_value[expose_php]" "off" \
+    "php_admin_value[memory_limit]" "128M"
 
 echo + "ln -s /etc/php-fpm/php-fpm.conf …/usr/local/etc/php-fpm.conf" >&2
 ln -s "/etc/php-fpm/php-fpm.conf" "$MOUNT/usr/local/etc/php-fpm.conf"
