@@ -79,7 +79,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check latest versions
+      - name: PHP version information
         run: |
           ./versions.sh
 

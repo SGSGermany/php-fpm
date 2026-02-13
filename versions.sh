@@ -170,8 +170,10 @@ VERSION_LATEST_GLOBAL_MINOR="$(php_latest_global_version "$VERSION_MINOR")"
 echo + "VERSION_LATEST_GLOBAL_MAJOR=\"\$(php_latest_global_version $(quote "$VERSION_MAJOR"))\"" >&2
 VERSION_LATEST_GLOBAL_MAJOR="$(php_latest_global_version "$VERSION_MAJOR")"
 
-echo + "SUPPORT_STATUS=\"\$(grep -q -F $(quote "$VERSION_MINOR") <<< \"\$BRANCHES_GLOBAL\" && echo \"Supported\" || echo \"End of life\")\"" >&2
-SUPPORT_STATUS="$(grep -q -F "$VERSION_MINOR" <<< "$BRANCHES_GLOBAL" && echo "Supported" || echo "End of life")"
+echo + "SUPPORT_STATUS=\"\$([ $(quote "$VERSION_MINOR") == $(quote "$VERSION_LATEST_GLOBAL_MAJOR") ] && echo \"Latest\"" \
+    "|| { grep -q -Fx $(quote "$VERSION_MINOR") <<< \"\$BRANCHES_GLOBAL\" && echo \"Supported\" || echo \"End of life\"; })\"" >&2
+SUPPORT_STATUS="$([ "$VERSION_MINOR" == "$VERSION_LATEST_GLOBAL_MAJOR" ] && echo "Latest" \
+    || { grep -q -Fx "$VERSION_MINOR" <<< "$BRANCHES_GLOBAL" && echo "Supported" || echo "End of life"; })"
 
 echo "Milestone: $MILESTONE"
 echo "Version: $VERSION"
