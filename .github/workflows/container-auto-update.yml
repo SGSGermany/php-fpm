@@ -26,13 +26,19 @@ jobs:
       BUILD_MATRIX: ${{ steps.generate-jobs.outputs.BUILD_MATRIX }}
 
     steps:
+      - name: Setup CI tools
+        run: |
+          . <(curl -fsS -L "$CI_TOOLS_SETUP" | bash -s ~/ci-tools)
+          echo "CI_TOOLS=$CI_TOOLS" | tee -a "$GITHUB_ENV"
+          echo "CI_TOOLS_PATH=$CI_TOOLS_PATH" | tee -a "$GITHUB_ENV"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Generate jobs
         id: generate-jobs
         run: |
-          MILESTONES="$(ls -1 ./branches/)"
+          MILESTONES="$(./branches.sh)"
           
           echo ::group::Jobs list
           echo "$MILESTONES"
