@@ -38,18 +38,20 @@ jobs:
       - name: Generate jobs
         id: generate-jobs
         run: |
-          MILESTONES="$(./branches.sh)"
+          MILESTONES="$(./branches.sh)" || EXIT_CODE=$?
           
           echo ::group::Jobs list
           echo "$MILESTONES"
           echo ::endgroup::
           
-          echo "BUILD_MATRIX=$(jq -R . <<< "$MILESTONES" | jq -c -s '{"MILESTONE": .}')" >> $GITHUB_OUTPUT
+          echo "BUILD_MATRIX=$([ -z "$MILESTONES" ] || jq -Rcn '{"MILESTONE": [inputs]}' <<< "$MILESTONES")" >> $GITHUB_OUTPUT
+          exit ${EXIT_CODE:-0}
 
   build:
     name: Build & publish container
 
     needs: generate-jobs
+    if: ${{ always() && needs.generate-jobs.outputs.BUILD_MATRIX }}
 
     runs-on: ubuntu-latest
     permissions:

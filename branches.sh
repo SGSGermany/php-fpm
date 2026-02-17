@@ -24,6 +24,7 @@ source "$CI_TOOLS_PATH/helper/common.sh.inc"
 BUILD_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 
 VERSION_URL="https://www.php.net/releases/index.php?json"
+EXIT_CODE=0
 
 echo + "BRANCHES_LOCAL=\"\$(find ./branches/ -mindepth 1 -maxdepth 1 -type d -printf '%f\n')\"" >&2
 BRANCHES_LOCAL="$(find "$BUILD_DIR/branches/" -mindepth 1 -maxdepth 1 -type d -printf '%f\n')"
@@ -38,10 +39,12 @@ echo + "BRANCHES_MISSING=\"\$(comm -13 <(sort <<< \"\$BRANCHES_LOCAL\") <(sort <
 BRANCHES_MISSING="$(comm -13 <(sort <<< "$BRANCHES_LOCAL") <(sort <<< "$BRANCHES_GLOBAL"))"
 
 if [ -n "$BRANCHES_MISSING" ]; then
-    echo "Explicit build instructions for the following PHP branches are missing, using defaults..." >&2
+    echo "Explicit build instructions for the following PHP branches are missing" >&2
     sed -e 's/^/- /' <<< "$BRANCHES_MISSING" >&2
+    EXIT_CODE=1
 fi
 
-echo + "{ echo \"\$BRANCHES_LOCAL\"; echo \"\$BRANCHES_MISSING\"; } | sort_semver" >&2
-{ [ -z "$BRANCHES_LOCAL" ] || echo "$BRANCHES_LOCAL"; [ -z "$BRANCHES_MISSING" ] || echo "$BRANCHES_MISSING"; } \
-    | sort_semver
+echo + "sort_semver <<< \"\$BRANCHES_LOCAL\"" >&2
+[ -z "$BRANCHES_LOCAL" ] || sort_semver <<< "$BRANCHES_LOCAL"
+
+exit $EXIT_CODE
