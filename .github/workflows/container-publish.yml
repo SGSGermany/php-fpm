@@ -38,7 +38,7 @@ jobs:
           echo "CI_TOOLS_PATH=$CI_TOOLS_PATH" | tee -a "$GITHUB_ENV"
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Generate jobs
         id: generate-jobs
@@ -85,10 +85,10 @@ jobs:
           echo "CI_TOOLS_PATH=$CI_TOOLS_PATH" | tee -a "$GITHUB_ENV"
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Log into container registry ${{ env.REGISTRY }}
-        uses: redhat-actions/podman-login@v1
+        uses: redhat-actions/podman-login@v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -114,7 +114,7 @@ jobs:
           podman image inspect "localhost/$IMAGE:${TAGS%% *}"
 
       - name: Push container image
-        uses: redhat-actions/push-to-registry@v2
+        uses: redhat-actions/push-to-registry@v3
         with:
           image: ${{ env.IMAGE }}
           registry: ${{ env.REGISTRY }}/${{ env.OWNER }}
