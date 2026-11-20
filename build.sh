@@ -185,11 +185,17 @@ echo + "ln -s /etc/php-fpm/php-fpm.conf …/usr/local/etc/php-fpm.conf" >&2
 ln -s "/etc/php-fpm/php-fpm.conf" "$MOUNT/usr/local/etc/php-fpm.conf"
 
 # pear config
-echo + "mv …/usr/local/etc/pear.conf …/etc/pear.conf" >&2
-mv "$MOUNT/usr/local/etc/pear.conf" "$MOUNT/etc/pear.conf"
+# PHP 8.6+ no longer ships with PEAR / PECL
+if [ -e "$MOUNT/usr/local/etc/pear.conf" ]; then
+    echo + "mv …/usr/local/etc/pear.conf …/etc/pear.conf" >&2
+    mv "$MOUNT/usr/local/etc/pear.conf" "$MOUNT/etc/pear.conf"
 
-echo + "ln -s /etc/pear.conf …/usr/local/etc/pear.conf" >&2
-ln -s "/etc/pear.conf" "$MOUNT/usr/local/etc/pear.conf"
+    echo + "ln -s /etc/pear.conf …/usr/local/etc/pear.conf" >&2
+    ln -s "/etc/pear.conf" "$MOUNT/usr/local/etc/pear.conf"
+fi
+
+# install PIE
+php_pie_install "$CONTAINER"
 
 # branch-specific build script
 if [ -f "$BUILD_DIR/branches/$MILESTONE/build.sh.inc" ]; then
@@ -198,6 +204,9 @@ if [ -f "$BUILD_DIR/branches/$MILESTONE/build.sh.inc" ]; then
 fi
 
 # finalize image
+echo + "rm -rf …/root/.pie …/root/.composer"
+rm -rf "$MOUNT/root/.pie" "$MOUNT/root/.composer"
+
 cleanup "$CONTAINER"
 
 con_cleanup "$CONTAINER"
