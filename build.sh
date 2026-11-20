@@ -204,8 +204,7 @@ if [ -f "$BUILD_DIR/branches/$MILESTONE/build.sh.inc" ]; then
 fi
 
 # finalize image
-echo + "rm -rf …/root/.pie …/root/.composer"
-rm -rf "$MOUNT/root/.pie" "$MOUNT/root/.composer"
+php_cleanup "$CONTAINER"
 
 cleanup "$CONTAINER"
 
